@@ -1,16 +1,18 @@
+# 作者为每一种相互作用都是实现的读取方法，用来读取数据文件
 from .node_to_node import NodeToNode
 from .drug_to_protein import DrugToProtein
 from .indication_to_protein import IndicationToProtein
 from .protein_to_protein import ProteinToProtein
 from .protein_to_biological_function import ProteinToBiologicalFunction
 from .biological_function_to_biological_function import BiologicalFunctionToBiologicalFunction
-
+# 数学库
 import networkx as nx
 import pandas as pd
 import os
 import scipy
 import pickle
 
+# 用于区分计算中的node类型打的标签，与文件中对应
 DRUG = "drug"
 INDICATION = "indication"
 PROTEIN = "protein"
@@ -24,14 +26,37 @@ INDICATION_PROTEIN = "indication-protein"
 PROTEIN_PROTEIN = "protein-protein"
 PROTEIN_BIOLOGICAL_FUNCTION = "protein-biological_function"
 BIOLOGICAL_FUNCTION_BIOLOGICAL_FUNCTION = "biological_function-biological_function"
-
+# 多尺度相互作用类
 class MSI():
-	def __init__(self, nodes = [DRUG, INDICATION, PROTEIN, BIOLOGICAL_FUNCTION], edges = [DRUG_PROTEIN, INDICATION_PROTEIN, PROTEIN_PROTEIN, PROTEIN_BIOLOGICAL_FUNCTION, BIOLOGICAL_FUNCTION_BIOLOGICAL_FUNCTION], drug2protein_file_path = "data/1_drug_to_protein.tsv", drug2protein_directed = False, indication2protein_file_path = "data/2_indication_to_protein.tsv", indication2protein_directed = False, protein2protein_file_path = "data/3_protein_to_protein.tsv", protein2protein_directed = False, protein2biological_function_file_path = "data/4_protein_to_biological_function.tsv", protein2biological_function_directed = False, biological_function2biological_function_file_path = "data/5_biological_function_to_biological_function.tsv", biological_function2biological_function_directed = True):
+	# 数据文件路径设置
+	def __init__(self, nodes = [DRUG, INDICATION, PROTEIN, BIOLOGICAL_FUNCTION], 
+		edges = [
+			DRUG_PROTEIN, 
+			INDICATION_PROTEIN, 
+			PROTEIN_PROTEIN, 
+			PROTEIN_BIOLOGICAL_FUNCTION, 
+			BIOLOGICAL_FUNCTION_BIOLOGICAL_FUNCTION
+		], 
+		drug2protein_file_path = "data/1_drug_to_protein.tsv", 
+		drug2protein_directed = False, 
+		indication2protein_file_path = "data/2_indication_to_protein.tsv", 
+		indication2protein_directed = False, 
+		protein2protein_file_path = "data/3_protein_to_protein.tsv", 
+		protein2protein_directed = False, 
+		protein2biological_function_file_path = "data/4_protein_to_biological_function.tsv", 
+		protein2biological_function_directed = False, 
+		biological_function2biological_function_file_path = "data/5_biological_function_to_biological_function.tsv", 
+		biological_function2biological_function_directed = True):
+		print("nodes:{}".format(nodes))
+		print("edges:{}".format(edges))
+
 		# Parameters
+		# 图参数拷贝
 		self.nodes = nodes
 		self.edges = edges
 
 		# File paths
+		# 文件路径存入类内变量
 		self.drug2protein_file_path = drug2protein_file_path
 		self.indication2protein_file_path = indication2protein_file_path
 		self.protein2protein_file_path = protein2protein_file_path
@@ -39,18 +64,19 @@ class MSI():
 		self.biological_function2biological_function_file_path = biological_function2biological_function_file_path
 
 		# Directed
+		# 存疑，看文章，猜测是用设置那些网络相互关联
 		self.drug2protein_directed = drug2protein_directed
 		self.indication2protein_directed = indication2protein_directed
 		self.protein2protein_directed = protein2protein_directed
 		self.protein2biological_function_directed = protein2biological_function_directed
 		self.biological_function2biological_function_directed = biological_function2biological_function_directed
-
+	# 图增加边关系
 	def add_edges(self, edge_list, from_node_type, to_node_type):
 		for from_node, to_node in edge_list:
 			self.graph.add_edge(from_node, to_node)
 			self.graph.node[from_node]["type"] = from_node_type
 			self.graph.node[to_node]["type"] = to_node_type
-
+	# 字典合并（内部调用，不关心）
 	def merge_one_to_one_dicts(self, dict_list):
 		out_dict = dict()
 		for dict_ in dict_list:
@@ -60,7 +86,7 @@ class MSI():
 				else:
 					out_dict[k] = v
 		return out_dict
-
+	# 节点类型合并，无需关心
 	def load_node2type(self):
 		# Merge the node2type of each component (these are one to one dictionaries)
 		node2type__list = []
@@ -88,7 +114,8 @@ class MSI():
 	def load_name2node(self):
 		name2node = {v:k for k,v in self.node2name.items()}
 		self.name2node = name2node
-
+	# 加载图
+	# 1. 讲数据文件实际加载进网络中
 	def load_graph(self):
 		# Initialize graph
 		self.graph = nx.Graph()
@@ -116,8 +143,9 @@ class MSI():
 			self.add_edges(self.components["biological_function_to_biological_function"].edge_list, BIOLOGICAL_FUNCTION, BIOLOGICAL_FUNCTION)
 
 		# Make graph directional (copy forward and reverse of each edge)
+		# 使图形具有方向性(每条边的正向和反向复制)
 		self.graph = self.graph.to_directed()
-
+	# 加载节点idx映射和节点列表
 	def load_node_idx_mapping_and_nodelist(self):
 		# Prepare
 		nodes = self.graph.nodes()
@@ -132,7 +160,7 @@ class MSI():
 		self.nodelist = nodelist
 		self.node2idx = node2idx
 		self.idx2node = idx2node
-
+	# 加载保存的节点idx映射和节点列表
 	def load_saved_node_idx_mapping_and_nodelist(self, save_load_file_path):
 		# Load node2idx
 		node2idx_file = os.path.join(save_load_file_path, "node2idx.pkl")
@@ -149,19 +177,19 @@ class MSI():
 		for i in range(0, len(self.idx2node)):
 			nodelist.append(self.idx2node[i])
 		self.nodelist = nodelist
-
+	# 保存 node2idx.pkl 
 	def save_node2idx(self, save_load_file_path):
 		node2idx_file_path = os.path.join(save_load_file_path, "node2idx.pkl")
 		# assert(not(os.path.isfile(node2idx_file_path)))
 		with open(node2idx_file_path, "wb") as f:
 			pickle.dump(self.node2idx, f)
-
+	# 取出图中的 药物节点
 	def load_drugs_in_graph(self):
 		self.drugs_in_graph = list(self.type2nodes[DRUG])
-
+	# 取出图中的 疾病节点
 	def load_indications_in_graph(self):
 		self.indications_in_graph = list(self.type2nodes[INDICATION])
-	
+	# 取出 药物-蛋白 、 疾病-蛋白 节点
 	def load_drug_or_indication2proteins(self):
 		drug_or_indication2proteins = dict.fromkeys(self.drugs_in_graph + self.indications_in_graph)
 		for drug in self.drugs_in_graph:
@@ -171,7 +199,7 @@ class MSI():
 			assert(not(nx.is_directed(self.components["indication_to_protein"].graph)))
 			drug_or_indication2proteins[indication] = set(self.components["indication_to_protein"].graph.neighbors(indication))
 		self.drug_or_indication2proteins = drug_or_indication2proteins
-
+	# load函数是各种加载的入口
 	def load(self):
 		self.load_graph()
 		self.load_node_idx_mapping_and_nodelist()
@@ -182,19 +210,19 @@ class MSI():
 		self.load_drugs_in_graph()
 		self.load_indications_in_graph()
 		self.load_drug_or_indication2proteins()
-
+	# 相互作用关系保存为 graph.pkl
 	def save_graph(self, save_load_file_path):
 		graph_file_path = os.path.join(save_load_file_path, "graph.pkl")
 		# assert(not(os.path.isfile(graph_file_path)))
 		with open(graph_file_path, "wb") as f:
 			pickle.dump(self.graph, f)
-
+	# 内部使用，不关心（字典的一些处理）
 	def add_to_cs_adj_dict(self, node, successor_type, successor):
 		if (successor_type in self.cs_adj_dict[node]):
 			self.cs_adj_dict[node][successor_type].append(successor)
 		else:
 			self.cs_adj_dict[node][successor_type] = [successor]
-
+	# 创建类特定的邻接字典
 	def create_class_specific_adjacency_dictionary(self):
 		self.cs_adj_dict = {node: {} for node in self.graph.nodes()}
 		for node in self.graph.nodes():
@@ -215,8 +243,9 @@ class MSI():
 						assert(False)
 				else:
 					self.add_to_cs_adj_dict(node, successor_type, successor)
-
+	# 
 	def weight_graph(self, weights):
+		# 创建类特定的邻接字典
 		self.create_class_specific_adjacency_dictionary()
 		for from_node, adj_dict in self.cs_adj_dict.items():
 			for node_type, to_nodes in adj_dict.items():

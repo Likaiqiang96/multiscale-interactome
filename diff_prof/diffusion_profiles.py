@@ -10,6 +10,7 @@ import numpy as np
 WEIGHT = 'weight'
 
 class DiffusionProfiles():
+	# 参数设置，初始化类
 	def __init__(self, alpha, max_iter, tol, weights, num_cores, save_load_file_path):
 		self.alpha = alpha
 		self.max_iter = max_iter
@@ -17,15 +18,16 @@ class DiffusionProfiles():
 		self.weights = weights
 		self.num_cores = num_cores
 		self.save_load_file_path = save_load_file_path
-
+	# （子函数，当作黑盒即可）
 	def get_initial_M(self, msi):
 		# This function is adapted from the NetworkX implementation of Personalized PageRank #
+		# 使用稀疏邻接矩阵存储图
 		M = nx.to_scipy_sparse_matrix(msi.graph, nodelist = msi.nodelist, weight = WEIGHT, dtype = float)
 		N = len(msi.graph)
 		if (N == 0):
 			assert(False)
 		self.initial_M = M
-
+	# （子函数，当作黑盒即可）将M转换成除选定药物外的所有适应症
 	def convert_M_to_make_all_drugs_indications_sinks_except_selected(self, msi, selected_drugs_and_indications):
 		reconstructed_M = copy.deepcopy(self.initial_M)
 
@@ -45,7 +47,7 @@ class DiffusionProfiles():
 		i, j = zip(*idxs_to_remove_out_edges)
 		reconstructed_M[i, j] = 0.0
 		return reconstructed_M
-
+	# （子函数，当作黑盒即可）
 	def refine_M_S(self, M):
 		# This function is adapted from the NetworkX implementation of Personalized PageRank #
 		S = scipy.array(M.sum(axis=1)).flatten()
@@ -54,14 +56,14 @@ class DiffusionProfiles():
 		M = Q * M
 
 		return M, S
-
+	# （子函数，当作黑盒即可） 得到选定的字典
 	def get_personalization_dictionary(self, nodes_to_start_from, nodelist):
 		personalization_dict = dict.fromkeys(nodelist, 0)
 		N = len(nodes_to_start_from)
 		for node in nodes_to_start_from:
 			personalization_dict[node] = 1./N
 		return personalization_dict
-
+	# （子函数，当作黑盒即可）通过幂迭代计算药物和疾病扩散剖面
 	def power_iteration(self, M, S, nodelist, per_dict):
 		# This function is adapted from the NetworkX implementation of Personalized PageRank #
 		# Size of nodelist
@@ -88,27 +90,30 @@ class DiffusionProfiles():
 			if err < N * self.tol:
 				return x
 		raise NetworkXError('pagerank_scipy: power iteration failed to converge in %d iterations.' % self.max_iter)
-
+	# 文件名拼接
 	def clean_file_name(self, file_name):
 		return "".join([c for c in file_name if c.isalpha() or c.isdigit() or c==' ' or c =="_"]).rstrip()
-
+	# 扩散谱保存成.npy 文件（numpy数据文件，存储了概率）
 	def save_diffusion_profile(self, diffusion_profile, selected_drug_or_indication):
 		f = os.path.join(self.save_load_file_path, self.clean_file_name(selected_drug_or_indication) + "_p_visit_array.npy")
 		np.save(f, diffusion_profile)
-
+	# 用于多线程的任务分配，可不关心
 	def calculate_diffusion_profile_batch(self, msi, selected_drugs_and_indications_batch):
 		for selected_drugs_and_indications in selected_drugs_and_indications_batch:
 			self.calculate_diffusion_profile(msi, selected_drugs_and_indications)    		
-
+	# 计算扩散核心函数，负责计算，通过msi类传递进来网络信息
 	def calculate_diffusion_profile(self, msi, selected_drugs_and_indications):
-		assert(len(selected_drugs_and_indications) == 1) # Not enabling functionality to run from multiple
+		# Not enabling functionality to run from multiple
+		# 判断是否开启多线程
+		assert(len(selected_drugs_and_indications) == 1) 
 		selected_drug_or_indication = selected_drugs_and_indications[0]
+		# 将M转换成除选定药物外的所有适应症
 		M = self.convert_M_to_make_all_drugs_indications_sinks_except_selected(msi, selected_drugs_and_indications)
 		M, S = self.refine_M_S(M)
 		per_dict = self.get_personalization_dictionary(selected_drugs_and_indications, msi.nodelist)
 		diffusion_profile = self.power_iteration(M, S, msi.nodelist, per_dict)
 		self.save_diffusion_profile(diffusion_profile, selected_drug_or_indication)
-
+	# 多线程任务分配相关
 	def batch_list(self, list_, batch_size = None, num_cores = None):
 		if batch_size == float('inf'):
 			batched_list = [list_]
@@ -119,9 +124,12 @@ class DiffusionProfiles():
 			for i in range(0, len(list_), batch_size):
 				batched_list.append(list_[i:i + batch_size])
 		return batched_list
-
+	# 扩散谱计算入口函数，负责计算任务创建
+	# 1. 存储多尺度相互作用网络数据到文件
+	# 2. 多线程调度
 	def calculate_diffusion_profiles(self, msi):
 		# Save MSI graph and node2idx
+		# 设置pickle文件保存路径 为 results/
 		msi.save_graph(self.save_load_file_path) 
 		msi.save_node2idx(self.save_load_file_path)
 
@@ -153,7 +161,7 @@ class DiffusionProfiles():
 		for job in procs:
 			proc.join()
 			proc.terminate()
-
+	# 从计算好的扩散谱文件中加载概率数据
 	def load_diffusion_profiles(self, drugs_and_indications):
 		assert(not(self.save_load_file_path is None))
 

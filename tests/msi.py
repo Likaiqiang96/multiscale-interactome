@@ -11,7 +11,7 @@ def test_msi():
 	msi.load()
 	msi_graph = msi.graph
 
-	# Same nodes?
+	# Same nodes? 
 	assert(set(msi_graph.nodes()) == set(saved_graph.nodes()))
 
 	# Same edges?
