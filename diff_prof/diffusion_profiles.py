@@ -96,6 +96,7 @@ class DiffusionProfiles():
 	# 扩散谱保存成.npy 文件（numpy数据文件，存储了概率）
 	def save_diffusion_profile(self, diffusion_profile, selected_drug_or_indication):
 		f = os.path.join(self.save_load_file_path, self.clean_file_name(selected_drug_or_indication) + "_p_visit_array.npy")
+		print('{}_p_visit_array.npy'.format(self.clean_file_name(selected_drug_or_indication)))
 		np.save(f, diffusion_profile)
 	# 用于多线程的任务分配，可不关心
 	def calculate_diffusion_profile_batch(self, msi, selected_drugs_and_indications_batch):
